@@ -72,7 +72,7 @@ class BQ(object):
       with open(self.config['nvd_schema'], 'r') as infile:
         jsonschema = json.load(infile)
     except TypeError as e:
-      raise TypeError('json.load failed in BQ.parse_bq_json_schema: ' + str(e))
+      raise TypeError(f'json.load failed in BQ.parse_bq_json_schema: {str(e)}')
     except json.JSONDecodeError as e:
       raise e
 
@@ -95,9 +95,9 @@ class BQ(object):
       None
     """
     project_name = self.config['project']
-    table_name = project_name + '.' + dataset_name + '.nvd'
+    table_name = f'{project_name}.{dataset_name}.nvd'
     try:
-      d = bigquery.Dataset(project_name + '.' + dataset_name)
+      d = bigquery.Dataset(f'{project_name}.{dataset_name}')
       dataset = self.client.create_dataset(d)
     except Conflict:
       # it's ok, it already exists
@@ -122,9 +122,7 @@ class BQ(object):
       DefaultCredentialsError: if there's a problem with BQ auth
       TypeError: if there's an internal problem with client.query (job_config)
     """
-    query = "SELECT " \
-            "  COUNT(cve.CVE_data_meta.ID) AS Count " \
-            "FROM {}.nvd".format(dataset)
+    query = f"SELECT   COUNT(cve.CVE_data_meta.ID) AS Count FROM {dataset}.nvd"
 
     try:
       query_job = self.client.query(query)
@@ -153,16 +151,12 @@ class BQ(object):
     Raises:
 
     """
-    query = "SELECT " \
-            "  cve.CVE_data_meta.ID AS ID " \
-            "FROM {}.nvd".format(dataset)
+    query = f"SELECT   cve.CVE_data_meta.ID AS ID FROM {dataset}.nvd"
 
     cve_list = []
     try:
       query_job = self.client.query(query)
-      for row in query_job:
-        cveid = row['ID']
-        cve_list.append(cveid)
+      cve_list.extend(row['ID'] for row in query_job)
     except TypeError as e:
       raise e
 
@@ -182,7 +176,7 @@ class BQ(object):
       None
     """
     project_name = self.config['project']
-    dataset_name = project_name + '.' + dataset
+    dataset_name = f'{project_name}.{dataset}'
     table_name = 'nvd'
 
     # dataset_ref = self.client.dataset(dataset_name)

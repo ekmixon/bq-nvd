@@ -58,12 +58,12 @@ class BQNVD(object):
   def print_debug(message):
     """Print debug messages to stdout in expectation of Stackdriver getting
     container logs from GKE."""
-    print('+++ bq-ndv.py debug: ' + message)
+    print(f'+++ bq-ndv.py debug: {message}')
 
   @staticmethod
   def print_error_and_exit(message, exception, signal):
     """Helper funciton to print stack trace and exit 1"""
-    print(message + ': ' + str(exception))
+    print(f'{message}: {str(exception)}')
     traceback.print_exc(file=sys.stdout)
     sys.exit(signal)
 
@@ -73,16 +73,12 @@ class BQNVD(object):
     try:
       cve_count = self.bq.count_cves(dataset)
     except TypeError as e:
-      self.print_error_and_exit('count_cves failed on dataset ' + dataset, e, 1)
+      self.print_error_and_exit(f'count_cves failed on dataset {dataset}', e, 1)
 
-    # There are over 130k CVEs in the NVD, so if it looks like there aren't
-    # enough, either we've never bootstrapped or something's gone wrong. So
-    # either way, we'll bootstrap.
-    if cve_count < 130000:
-      self.bootstrap()
-      return True
-    else:
+    if cve_count >= 130000:
       return False
+    self.bootstrap()
+    return True
 
   def bootstrap(self):
     """Process the entirety of NVD."""
@@ -105,7 +101,7 @@ class BQNVD(object):
 
   def download(self, name):
     """Step 1 - Download the NVD json feed."""
-    self.print_debug('downloading ' + name)
+    self.print_debug(f'downloading {name}')
     try:
       local_path = self.config['local_path']
       downloaded_filename = self.d.download(name, local_path)
@@ -115,12 +111,11 @@ class BQNVD(object):
 
   def extract(self, downloaded_filename):
     """Step 2 - Decompress tar.gz json data and return a dict."""
-    self.print_debug('extracting ' + downloaded_filename)
+    self.print_debug(f'extracting {downloaded_filename}')
     try:
       nvd_dict = self.etl.extract(downloaded_filename)
-    except (ValueError, TypeError, JSONDecodeError) as e:
-      self.print_error_and_exit('extraction failed for ' + downloaded_filename,
-                                e, 1)
+    except (ValueError, TypeError) as e:
+      self.print_error_and_exit(f'extraction failed for {downloaded_filename}', e, 1)
     return nvd_dict
 
   def transform(self, nvd_dict, downloaded_filename):
@@ -132,7 +127,7 @@ class BQNVD(object):
                                                           downloaded_filename),
                                                       self.bq)
     except IOError as e:
-      self.print_error_and_exit('extraction failed for ' + downloaded_filename, e, 1)
+      self.print_error_and_exit(f'extraction failed for {downloaded_filename}', e, 1)
 
     return transformed_local_filename
 
@@ -142,12 +137,13 @@ class BQNVD(object):
       self.print_debug('no updates to load')
       return
 
-    self.print_debug('loading ' + transformed_local_filename)
+    self.print_debug(f'loading {transformed_local_filename}')
     try:
       bucket_name = self.config['bucket_name']
       self.etl.load(self.bq, transformed_local_filename, bucket_name)
     except (Conflict, GoogleCloudError) as e:
-      self.print_error_and_exit('load failed for ' + transformed_local_filename, e, 1)
+      self.print_error_and_exit(f'load failed for {transformed_local_filename}',
+                                e, 1)
 
 
 def main():

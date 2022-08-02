@@ -37,14 +37,14 @@ class ETL(object):
     except ValueError as e:
       raise e
     except TypeError as e:
-      raise TypeError('gzip.open failed in ETL.extract: ' + str(e))
+      raise TypeError(f'gzip.open failed in ETL.extract: {str(e)}')
 
     try:
       nvd_dict = json.loads(json_content.decode('utf-8'))
     except json.JSONDecodeError as e:
       raise e
     except TypeError as e:
-      raise TypeError('json.loads failed in ETL.extract: ' + str(e))
+      raise TypeError(f'json.loads failed in ETL.extract: {str(e)}')
 
     return nvd_dict
 
@@ -69,8 +69,8 @@ class ETL(object):
     """
     path = self.config['local_path']
     local_file = path + \
-                 filename.replace('.json.gz', '') + \
-                 '_newline.json'
+                   filename.replace('.json.gz', '') + \
+                   '_newline.json'
 
     # We can discard the metadata contained in the CVE_data* keys.
     # CVE_Items has what we want.
@@ -80,12 +80,8 @@ class ETL(object):
     if deltas_only:
       cve_ids = bq.get_cve_ids(self.config['dataset'])
 
-      for cve in cve_list:
-        # todo: come up with more efficient version of the following
-        # maybe just accept duplicate entries then remove them with a query
-        # once the loading is done? need to think about it.
-        if cve['cve']['CVE_data_meta']['ID'] not in cve_ids:
-          scrubbed_list.append(cve)
+      scrubbed_list.extend(cve for cve in cve_list
+                           if cve['cve']['CVE_data_meta']['ID'] not in cve_ids)
     else:
       # If we're not doing a deltas_only transform, we just take the whole
       # cve_list
@@ -148,9 +144,7 @@ class ETL(object):
         # i know, i know
         # todo: properly catch exceptions here
         try_count += 1
-        if try_count < 3:
-          pass
-        else:
+        if try_count >= 3:
           raise e
 
     self.bq_load_from_gcs(bq, self.config['dataset'], filename, bucket_name)
@@ -172,5 +166,5 @@ class ETL(object):
     Raises:
       None
     """
-    uri = 'gs://' + bucket_name + '/' + os.path.basename(filename)
+    uri = f'gs://{bucket_name}/{os.path.basename(filename)}'
     bq.load_from_gcs(dataset, uri)
